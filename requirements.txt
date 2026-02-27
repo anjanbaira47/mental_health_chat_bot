@@ -1,0 +1,15 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+groq>=0.4.1
+streamlit==1.28.1
+requests==2.31.0
+python-multipart==0.0.7
+openai-whisper>=20250625
+torch>=2.8.0
+numba>=0.60.0
+tiktoken>=0.12.0
+elevenlabs>=0.4.0
+streamlit-webrtc>=0.63.11
+soundfile>=0.12.1
+numpy>=1.23.0
