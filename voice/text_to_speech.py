@@ -1,14 +1,31 @@
 import base64
 import io
 import asyncio
+import threading
 import edge_tts
 
 
-async def _generate_speech(text):
-    """Generate speech using Microsoft Edge TTS (natural voice)."""
-    # Use an Indian English female voice - natural sounding
-    voice = "en-IN-NeerjaNeural"
-    communicate = edge_tts.Communicate(text, voice, rate="+10%")
+def _run_in_thread(text, voice, rate):
+    """Run async TTS in a separate thread with its own event loop."""
+    result = {"data": None}
+
+    def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result["data"] = loop.run_until_complete(_generate(text, voice, rate))
+        finally:
+            loop.close()
+
+    t = threading.Thread(target=_run)
+    t.start()
+    t.join(timeout=30)
+    return result["data"]
+
+
+async def _generate(text, voice, rate):
+    """Generate speech using Microsoft Edge TTS."""
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
     buf = io.BytesIO()
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
@@ -18,15 +35,16 @@ async def _generate_speech(text):
 
 
 def speak_text(text):
-    """Generate speech for the given text and return a base64 encoded mp3 string."""
+    """Generate speech and return base64 encoded mp3 string."""
     if not text:
         return None
 
     try:
-        audio_bytes = asyncio.run(_generate_speech(text))
+        voice = "en-IN-NeerjaNeural"
+        rate = "+10%"
+        audio_bytes = _run_in_thread(text, voice, rate)
         if audio_bytes:
-            encoded = base64.b64encode(audio_bytes).decode("utf-8")
-            return encoded
+            return base64.b64encode(audio_bytes).decode("utf-8")
         return None
     except Exception as e:
         print(f"Error generating speech: {e}")

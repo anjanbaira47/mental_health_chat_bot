@@ -294,29 +294,67 @@ st.markdown("""
     -webkit-text-fill-color: transparent;
     margin-bottom: 16px;
 }
+
+/* Send button styling */
+[data-testid="stButton"] button[kind="secondary"]:has(+ div) ,
+button[data-testid="baseButton-secondary"] {
+    transition: all 0.2s ease;
+}
+div[data-testid="stHorizontalBlock"]:last-of-type > div:last-child button {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.2rem !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 42px !important;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.4) !important;
+    transition: all 0.2s ease !important;
+}
+div[data-testid="stHorizontalBlock"]:last-of-type > div:last-child button:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 18px rgba(102,126,234,0.6) !important;
+}
+
+/* Hide 'Press Enter to apply' text */
+.stTextInput div[data-testid="InputInstructions"] {
+    display: none !important;
+}
+
+/* Login form — larger elements */
+[data-testid="stTabs"] button[role="tab"] {
+    font-size: 1.15rem !important;
+    padding: 12px 20px !important;
+}
+[data-testid="stTabs"] input {
+    font-size: 1.1rem !important;
+    padding: 14px 16px !important;
+}
+[data-testid="stTabs"] label {
+    font-size: 1.05rem !important;
+    font-weight: 500 !important;
+}
+[data-testid="stTabs"] button[kind="secondary"],
+[data-testid="stTabs"] button[data-testid="baseButton-secondary"] {
+    font-size: 1.1rem !important;
+    padding: 12px 20px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ─── SIDEBAR ───────────────────────────────────────────────────────────
-if "page" not in st.session_state:
-    st.session_state.page = "Get Started"
+# Auth URLs
+AUTH_REGISTER_URL = "http://127.0.0.1:8000/register"
+AUTH_LOGIN_URL = "http://127.0.0.1:8000/login"
+SESSIONS_URL = "http://127.0.0.1:8000/sessions"
+REPORT_URL = "http://127.0.0.1:8000/report"
 
-with st.sidebar:
-    st.markdown("### 🕊️ MindCare AI")
-    st.markdown("<small style='color:#9ca3af'>Your safe space to talk</small>", unsafe_allow_html=True)
-    st.markdown("---")
-    pages = ["Get Started", "Chat", "Resources"]
-    current_index = pages.index(st.session_state.page) if st.session_state.page in pages else 0
-    choice = st.selectbox("Navigate", pages, index=current_index, label_visibility="collapsed")
-    st.session_state.page = choice
-    st.markdown("---")
-    if st.button("🗑️  Clear Conversation"):
-        st.session_state.messages = []
-        st.session_state.last_response = None
-    st.markdown("---")
-    st.markdown("<small style='color:#6b7280'>A calm, supportive assistant.<br>Not a substitute for professional help.</small>", unsafe_allow_html=True)
-
-# Initialize state
+# Initialize state + restore session from file
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "last_response" not in st.session_state:
@@ -324,89 +362,114 @@ if "last_response" not in st.session_state:
 if "is_thinking" not in st.session_state:
     st.session_state.is_thinking = False
 
+import json as _json
+_SESSION_FILE = os.path.join(os.path.dirname(__file__), ".session.json")
+
+def _save_session():
+    """Save login session to file for refresh persistence."""
+    try:
+        with open(_SESSION_FILE, "w") as f:
+            _json.dump({"uid": st.session_state.user_id, "user": st.session_state.username, "pg": st.session_state.page}, f)
+    except: pass
+
+def _clear_session():
+    """Clear saved session file."""
+    try:
+        if os.path.exists(_SESSION_FILE):
+            os.remove(_SESSION_FILE)
+    except: pass
+
+# Restore session from file (survives refresh)
+if "logged_in" not in st.session_state:
+    try:
+        with open(_SESSION_FILE, "r") as f:
+            saved = _json.load(f)
+        if saved.get("uid") and saved.get("user"):
+            st.session_state.logged_in = True
+            st.session_state.user_id = int(saved["uid"])
+            st.session_state.username = saved["user"]
+            st.session_state.page = saved.get("pg", "Get Started")
+        else:
+            raise ValueError
+    except:
+        st.session_state.logged_in = False
+        st.session_state.user_id = None
+        st.session_state.username = ""
+        st.session_state.page = "Login"
+else:
+    if "page" not in st.session_state:
+        st.session_state.page = "Login"
+
+with st.sidebar:
+    st.markdown("### 🕊️ MindCare AI")
+    st.markdown("<small style='color:#9ca3af'>Your safe space to talk</small>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    if st.session_state.logged_in:
+        st.markdown(f"<div style='color:#43e97b;font-weight:600;margin-bottom:8px;'>👤 {st.session_state.username}</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
+        # Navigation tabs as buttons
+        nav_items = [
+            ("", "Get Started", "Home"),
+            ("", "Chat", "Chat"),
+            ("", "Tracker", "Tracker"),
+            ("", "Resources", "Resources"),
+        ]
+        for icon, page_name, label in nav_items:
+            is_active = st.session_state.page == page_name
+            if is_active:
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:10px 16px;
+                    border-radius:10px;margin-bottom:6px;font-weight:600;font-size:0.95rem;">
+                    {icon} {label}
+                </div>""", unsafe_allow_html=True)
+            else:
+                if st.button(f"{icon}  {label}", key=f"nav_{page_name}", use_container_width=True):
+                    st.session_state.page = page_name
+                    _save_session()
+                    st.rerun()
+
+        st.markdown("---")
+        if st.button("Clear Chat", use_container_width=True, key="clear_chat"):
+            st.session_state.messages = []
+            st.session_state.last_response = None
+            st.session_state.is_thinking = False
+            st.rerun()
+        if st.button("Logout", use_container_width=True, key="logout_btn"):
+            st.session_state.logged_in = False
+            st.session_state.user_id = None
+            st.session_state.username = ""
+            st.session_state.messages = []
+            st.session_state.last_response = None
+            st.session_state.page = "Login"
+            _clear_session()
+            st.rerun()
+    else:
+        st.markdown("<div style='color:#9ca3af;'>Please log in to continue</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("<small style='color:#6b7280'>A calm, supportive assistant.<br>Not a substitute for professional help.</small>", unsafe_allow_html=True)
+
 
 # ═══════════════════════════════════════════════════════════════════════
 #  WELCOME PAGE
 # ═══════════════════════════════════════════════════════════════════════
 def render_get_started():
-    st.markdown("""
-    <div class="hero-container">
-        <div class="hero-title">Welcome — You're Seen Here</div>
-        <div class="hero-subtitle">
+    st.markdown(f"""
+    <div style="text-align:center; padding:60px 20px 30px;">
+        <div style="font-size:3.5rem; margin-bottom:12px;">🕊️</div>
+        <div class="hero-title" style="font-size:2.2rem; margin-bottom:10px;">
+            Welcome, {st.session_state.username}
+        </div>
+        <div class="hero-subtitle" style="max-width:500px; margin:0 auto 40px; font-size:1.05rem; color:#6b7280;">
             A safe, non-judgmental space to share how you're feeling.
-            Our AI companion listens, supports, and guides you — anytime you need it.
+            Talk to our AI companion — anytime, anywhere.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Mental health information section
-    st.markdown("""
-    <div class="glass-card" style="margin-bottom:20px;">
-        <div style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin-bottom:12px;">🧠 Why Mental Health Matters</div>
-        <div style="color:#374151; line-height:1.8; font-size:0.95rem;">
-            Mental health is just as important as physical health. <strong>1 in 5 people</strong> experience a mental health condition each year,
-            yet many suffer in silence. Talking about your feelings is not a sign of weakness — it's a sign of strength.
-            Early support can make a real difference in managing stress, anxiety, and emotional challenges.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("""
-        <div class="glass-card" style="height:100%;">
-            <div style="font-size:1.1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">⚠️ Common Signs to Watch For</div>
-            <div style="color:#374151; line-height:1.8; font-size:0.9rem;">
-                😔 Persistent sadness or low mood<br>
-                😰 Excessive worry or fear<br>
-                😴 Changes in sleep or appetite<br>
-                🚫 Withdrawal from friends & activities<br>
-                💭 Difficulty concentrating<br>
-                😤 Unusual irritability or anger
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_b:
-        st.markdown("""
-        <div class="glass-card" style="height:100%;">
-            <div style="font-size:1.1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">🌱 Daily Wellness Tips</div>
-            <div style="color:#374151; line-height:1.8; font-size:0.9rem;">
-                🧘 Practice 5 minutes of mindfulness daily<br>
-                🏃 Move your body — even a short walk helps<br>
-                📓 Journal your thoughts before bed<br>
-                🤝 Stay connected with people you trust<br>
-                💤 Prioritize 7–8 hours of sleep<br>
-                🎵 Listen to music that lifts your mood
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Feature cards
-    st.markdown("""
-    <div class="feature-grid">
-        <div class="feature-card">
-            <div class="feature-icon" style="animation: float 3s ease-in-out infinite;">💬</div>
-            <div class="feature-title">Text Chat</div>
-            <div class="feature-desc">Type how you're feeling and receive empathetic, thoughtful responses.</div>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon" style="animation: float 3s ease-in-out infinite 0.3s;">🎙️</div>
-            <div class="feature-title">Voice Input</div>
-            <div class="feature-desc">Record your thoughts — we'll listen and respond with voice too.</div>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon" style="animation: float 3s ease-in-out infinite 0.6s;">🛡️</div>
-            <div class="feature-title">Safe & Private</div>
-            <div class="feature-desc">Crisis detection built-in. We'll always point you to real help when needed.</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Big start button
+    # Single prominent button
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         if st.button("🗣️  Start Conversation", use_container_width=True, key="start_conv"):
@@ -416,18 +479,26 @@ def render_get_started():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Quick-start prompts
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("😟  I'm feeling anxious", use_container_width=True):
-            st.session_state.messages.append({"role": "user", "content": "I'm feeling anxious about work and can't sleep."})
-            st.session_state.page = "Chat"
-            st.rerun()
-    with col2:
-        if st.button("🤗  I need someone to talk to", use_container_width=True):
-            st.session_state.messages.append({"role": "user", "content": "I need someone to talk to. I'm feeling overwhelmed."})
-            st.session_state.page = "Chat"
-            st.rerun()
+    # Minimal feature summary — 3 clean icon cards
+    st.markdown("""
+    <div style="display:flex; justify-content:center; gap:30px; flex-wrap:wrap; padding:20px 0;">
+        <div style="text-align:center; width:160px;">
+            <div style="font-size:2rem; margin-bottom:8px;">💬</div>
+            <div style="font-weight:600; color:#1a1a2e; font-size:0.95rem;">Text Chat</div>
+            <div style="color:#9ca3af; font-size:0.8rem; margin-top:4px;">Type how you feel</div>
+        </div>
+        <div style="text-align:center; width:160px;">
+            <div style="font-size:2rem; margin-bottom:8px;">🎙️</div>
+            <div style="font-weight:600; color:#1a1a2e; font-size:0.95rem;">Voice Input</div>
+            <div style="color:#9ca3af; font-size:0.8rem; margin-top:4px;">Speak your thoughts</div>
+        </div>
+        <div style="text-align:center; width:160px;">
+            <div style="font-size:2rem; margin-bottom:8px;">📊</div>
+            <div style="font-weight:600; color:#1a1a2e; font-size:0.95rem;">Wellness Tracker</div>
+            <div style="color:#9ca3af; font-size:0.8rem; margin-top:4px;">Track your progress</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -475,6 +546,9 @@ def render_chat_messages():
 
 
 def render_chat():
+    if st.button("← Back", key="back_chat"):
+        st.session_state.page = "Get Started"
+        st.rerun()
     st.markdown('<div class="section-title">💬 Chat — I\'m here to listen</div>', unsafe_allow_html=True)
 
     left, right = st.columns([2.5, 1])
@@ -603,16 +677,22 @@ def render_chat():
         input_mode = st.radio("Input mode", ["💬 Text", "🎙️ Voice"], horizontal=True, label_visibility="collapsed")
 
     if input_mode == "💬 Text":
-        user_input = st.text_input("How are you feeling today?", placeholder="Type your message here…", label_visibility="collapsed")
-        if user_input and user_input != st.session_state.get("last_input", ""):
-            st.session_state.last_input = user_input
-            st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.form("chat_form", clear_on_submit=True):
+            input_col, btn_col = st.columns([9, 1])
+            with input_col:
+                user_input = st.text_input("How are you feeling today?", placeholder="Type your message here…", label_visibility="collapsed", key="chat_input")
+            with btn_col:
+                submitted = st.form_submit_button("⬆", use_container_width=True)
+        
+        if submitted and user_input and user_input.strip():
+            st.session_state.messages.append({"role": "user", "content": user_input.strip()})
             st.session_state.is_thinking = True
-            # Rerun to show thinking animation, then fetch
-            # We can't truly show the animation mid-request in Streamlit,
-            # so we fetch inline and rerun after.
             try:
-                r = requests.post(API_URL, json={"message": user_input, "audio": True}, timeout=30)
+                r = requests.post(API_URL, json={
+                    "message": user_input.strip(),
+                    "audio": True,
+                    "user_id": st.session_state.get("user_id")
+                }, timeout=30)
                 if r.status_code == 200:
                     data = r.json()
                     bot_reply = data.get("response", "Sorry, I couldn't process that.")
@@ -729,6 +809,9 @@ def render_chat():
 #  RESOURCES PAGE
 # ═══════════════════════════════════════════════════════════════════════
 def render_resources():
+    if st.button("← Back", key="back_resources"):
+        st.session_state.page = "Get Started"
+        st.rerun()
     st.markdown('<div class="section-title">🛡️ Resources & Support</div>', unsafe_allow_html=True)
 
     st.markdown("""
@@ -772,11 +855,241 @@ def render_resources():
     """, unsafe_allow_html=True)
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  LOGIN / SIGNUP PAGE
+# ═══════════════════════════════════════════════════════════════════════
+def render_login():
+    st.markdown("""
+    <div class="hero-container">
+        <div class="hero-title">🕊️ MindCare AI</div>
+        <div class="hero-subtitle">Sign in or create an account to begin your wellness journey.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        tab1, tab2 = st.tabs(["🔑 Login", "📝 Sign Up"])
+
+        with tab1:
+
+            login_user = st.text_input("Username", key="login_user", placeholder="Enter your username")
+            login_pass = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
+            if st.button("🔑  Log In", use_container_width=True, key="login_btn"):
+                if login_user and login_pass:
+                    try:
+                        r = requests.post(AUTH_LOGIN_URL, json={"username": login_user, "password": login_pass}, timeout=10)
+                        data = r.json()
+                        if data.get("success"):
+                            st.session_state.logged_in = True
+                            st.session_state.user_id = data["user_id"]
+                            st.session_state.username = login_user
+                            st.session_state.page = "Get Started"
+                            _save_session()
+                            st.rerun()
+                        else:
+                            st.error(data.get("message", "Login failed."))
+                    except Exception:
+                        st.error("Connection error. Is the backend running?")
+                else:
+                    st.warning("Please enter both username and password.")
+
+        with tab2:
+            reg_user = st.text_input("Choose a username", key="reg_user", placeholder="Pick a username")
+            reg_pass = st.text_input("Choose a password", type="password", key="reg_pass", placeholder="Min 4 characters")
+            reg_pass2 = st.text_input("Confirm password", type="password", key="reg_pass2", placeholder="Re-enter password")
+            if st.button("📝  Create Account", use_container_width=True, key="reg_btn"):
+                if not reg_user or not reg_pass:
+                    st.warning("Please fill in all fields.")
+                elif len(reg_pass) < 4:
+                    st.warning("Password must be at least 4 characters.")
+                elif reg_pass != reg_pass2:
+                    st.error("Passwords do not match.")
+                else:
+                    try:
+                        r = requests.post(AUTH_REGISTER_URL, json={"username": reg_user, "password": reg_pass}, timeout=10)
+                        data = r.json()
+                        if data.get("success"):
+                            # Auto-login after signup
+                            r2 = requests.post(AUTH_LOGIN_URL, json={"username": reg_user, "password": reg_pass}, timeout=10)
+                            login_data = r2.json()
+                            if login_data.get("success"):
+                                st.session_state.logged_in = True
+                                st.session_state.user_id = login_data["user_id"]
+                                st.session_state.username = reg_user
+                                st.session_state.page = "Get Started"
+                                _save_session()
+                                st.rerun()
+                            else:
+                                st.success("✅ Account created! Please log in.")
+                        else:
+                            st.error(data.get("message", "Registration failed."))
+                    except Exception:
+                        st.error("Connection error. Is the backend running?")
+
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  TRACKER PAGE
+# ═══════════════════════════════════════════════════════════════════════
+def render_tracker():
+    if st.button("← Back", key="back_tracker"):
+        st.session_state.page = "Get Started"
+        _save_session()
+        st.rerun()
+    st.markdown('<div class="section-title">📊 Your Wellness Tracker</div>', unsafe_allow_html=True)
+
+    user_id = st.session_state.get("user_id")
+    if not user_id:
+        st.warning("Please log in to view your tracker.")
+        return
+
+    # Fetch sessions from backend
+    try:
+        r = requests.post(SESSIONS_URL, json={"user_id": user_id}, timeout=10)
+        sessions = r.json().get("sessions", [])
+    except Exception:
+        st.error("Could not load tracker data. Is the backend running?")
+        return
+
+    if not sessions:
+        st.markdown("""
+        <div class="glass-card" style="text-align:center; padding:40px;">
+            <div style="font-size:3rem; margin-bottom:12px;">📊</div>
+            <div style="color:#6b7280; font-size:1.1rem;">
+                No sessions recorded yet.<br>Start chatting to build your wellness profile!
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # ── Summary stats ──
+    stress_scores = [s["stress_score"] for s in sessions]
+    anxiety_scores = [s["anxiety_score"] for s in sessions]
+    mood_labels = [s["mood_label"] for s in sessions]
+
+    avg_stress = sum(stress_scores) / len(stress_scores)
+    avg_anxiety = sum(anxiety_scores) / len(anxiety_scores)
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f"""
+        <div class="glass-card" style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:#667eea;">{len(sessions)}</div>
+            <div style="font-size:0.85rem; color:#6b7280;">Total Sessions</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#22c55e" if avg_stress <= 4 else "#eab308" if avg_stress <= 6 else "#ef4444"
+        st.markdown(f"""
+        <div class="glass-card" style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:{color};">{avg_stress:.1f}</div>
+            <div style="font-size:0.85rem; color:#6b7280;">Avg Stress (1-10)</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#22c55e" if avg_anxiety <= 4 else "#eab308" if avg_anxiety <= 6 else "#ef4444"
+        st.markdown(f"""
+        <div class="glass-card" style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:{color};">{avg_anxiety:.1f}</div>
+            <div style="font-size:0.85rem; color:#6b7280;">Avg Anxiety (1-10)</div>
+        </div>""", unsafe_allow_html=True)
+    with c4:
+        # Most common mood
+        from collections import Counter
+        mood_counter = Counter(mood_labels)
+        top_mood = mood_counter.most_common(1)[0][0].capitalize()
+        st.markdown(f"""
+        <div class="glass-card" style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:#667eea;">{top_mood}</div>
+            <div style="font-size:0.85rem; color:#6b7280;">Most Common Mood</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Charts ──
+    import pandas as pd
+    df = pd.DataFrame(sessions)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.set_index("timestamp")
+
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.markdown("**📈 Stress Level Over Time**")
+        st.line_chart(df[["stress_score"]], color="#ef4444")
+    with chart_col2:
+        st.markdown("**📈 Anxiety Level Over Time**")
+        st.line_chart(df[["anxiety_score"]], color="#667eea")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Mood distribution ──
+    st.markdown("**🎭 Mood Distribution**")
+    mood_df = pd.DataFrame(list(mood_counter.items()), columns=["Mood", "Count"])
+    mood_df = mood_df.sort_values("Count", ascending=False)
+    st.bar_chart(mood_df.set_index("Mood"))
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Recent sessions table ──
+    st.markdown("**📋 Recent Sessions**")
+    recent = sessions[-10:]
+    table_data = []
+    for s in reversed(recent):
+        table_data.append({
+            "Time": s["timestamp"][:16],
+            "Message": s["user_message"][:60] + ("..." if len(s["user_message"]) > 60 else ""),
+            "Stress": s["stress_score"],
+            "Anxiety": s["anxiety_score"],
+            "Mood": s["mood_label"].capitalize(),
+        })
+    import pandas as _pd
+    df_table = _pd.DataFrame(table_data)
+    df_table.index = range(len(df_table), 0, -1)  # n at top, 1 at bottom
+    df_table.index.name = "#"
+    st.table(df_table)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Download PDF report ──
+    st.markdown("**📥 Download Wellness Report**")
+    if st.button("📄  Generate PDF Report", use_container_width=True, key="pdf_btn"):
+        with st.spinner("Generating your wellness report…"):
+            try:
+                r = requests.post(REPORT_URL, json={"user_id": user_id}, timeout=15)
+                data = r.json()
+                pdf_b64 = data.get("pdf_base64")
+                if pdf_b64:
+                    pdf_bytes = base64.b64decode(pdf_b64)
+                    st.download_button(
+                        label="⬇️  Download PDF",
+                        data=pdf_bytes,
+                        file_name=f"mindcare_report_{st.session_state.username}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                else:
+                    st.error("Could not generate report.")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+
 # ─── PAGE ROUTING ──────────────────────────────────────────────────────
-page = st.session_state.get("page", "Get Started")
-if page == "Get Started":
-    render_get_started()
-elif page == "Chat":
-    render_chat()
+if not st.session_state.logged_in:
+    render_login()
 else:
-    render_resources()
+    page = st.session_state.get("page", "Get Started")
+    if page == "Get Started":
+        render_get_started()
+    elif page == "Chat":
+        render_chat()
+    elif page == "Tracker":
+        render_tracker()
+    elif page == "Resources":
+        render_resources()
+    else:
+        render_get_started()
+
+# ─── FOOTER ────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="text-align: center; color: #9ca3af; font-size: 0.85rem; padding: 20px 0; margin-top: 40px; border-top: 1px solid rgba(0,0,0,0.05);">
+    VARAHA 2026 all rights reserved
+</div>
+""", unsafe_allow_html=True)
